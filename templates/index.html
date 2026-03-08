@@ -61,7 +61,15 @@
     <ul>
       {% for result in results %}
       <li>
-        <div><code>{{ result.file }}</code></div>
+        <div>
+          {% if result.doc_path %}
+          <a href="{{ url_for('view_document', doc_path=result.doc_path) }}"
+            ><code>{{ result.file }}</code></a
+          >
+          {% else %}
+          <code>{{ result.file }}</code>
+          {% endif %}
+        </div>
         <div>Score: {{ "%.4f"|format(result.score) }}</div>
         <div class="muted">Total term hits: {{ result.term_hits }}</div>
         <div class="muted">Matched terms: {{ result.matches }}</div>

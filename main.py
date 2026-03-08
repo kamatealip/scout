@@ -4,7 +4,7 @@ import json
 import math
 import os
 import re
-from flask import Flask, render_template, request
+from flask import Flask, abort, render_template, request, send_from_directory
 
 INDEX_FILE = "word_counts.json"
 LEGACY_INDEX_FILE = "index.json"
@@ -93,6 +93,54 @@ def load_index_data() -> dict[str, dict[str, int]]:
     )
 
 
+def docs_relative_path(file_key: str) -> str | None:
+    normalized = file_key.replace("\\", "/")
+    docs_root = os.path.abspath(DEFAULT_DOCS_DIR)
+    docs_dir_name = os.path.basename(docs_root.rstrip("/")) or "docs"
+    docs_prefix = f"{docs_dir_name}/"
+
+    absolute_key = os.path.abspath(file_key)
+    try:
+        if os.path.commonpath([docs_root, absolute_key]) == docs_root:
+            return os.path.relpath(absolute_key, docs_root).replace(os.sep, "/")
+    except ValueError:
+        pass
+
+    if normalized.startswith(docs_prefix):
+        return normalized[len(docs_prefix):]
+
+    marker = f"/{docs_dir_name}/"
+    if marker in normalized:
+        return normalized.split(marker, 1)[1]
+
+    if normalized.endswith((".html", ".xhtml", ".xhtl")) and not normalized.startswith("/"):
+        return normalized.lstrip("./")
+
+    return None
+
+
+def safe_doc_path_or_404(doc_path: str) -> str:
+    docs_root = os.path.abspath(DEFAULT_DOCS_DIR)
+    normalized = os.path.normpath(doc_path).replace("\\", "/")
+    if normalized in (".", ""):
+        normalized = "index.html"
+
+    if normalized == ".." or normalized.startswith("../"):
+        abort(404)
+
+    absolute_file_path = os.path.abspath(os.path.join(docs_root, normalized))
+    try:
+        if os.path.commonpath([docs_root, absolute_file_path]) != docs_root:
+            abort(404)
+    except ValueError:
+        abort(404)
+
+    if not os.path.isfile(absolute_file_path):
+        abort(404)
+
+    return normalized
+
+
 def tf_idf_search(
     query: str,
     counts_by_file: dict[str, dict[str, int]],
@@ -155,9 +203,11 @@ def tf_idf_search(
         coverage = unique_matches / len(unique_query_terms)
         frequency_boost = 1.0 + 0.15 * math.log1p(term_hits)
         score = tf_idf_score * frequency_boost * (1.0 + 0.35 * coverage)
+        doc_path = docs_relative_path(file_key)
         ranked_results.append(
             {
                 "file": file_key,
+                "doc_path": doc_path,
                 "score": score,
                 "matches": ", ".join(matched_terms),
                 "term_hits": term_hits,
@@ -172,6 +222,20 @@ def tf_idf_search(
 
 
 app = Flask(__name__)
+
+
+@app.route("/docs/")
+def view_docs_index():
+    docs_root = os.path.abspath(DEFAULT_DOCS_DIR)
+    safe_doc_path = safe_doc_path_or_404("index.html")
+    return send_from_directory(docs_root, safe_doc_path)
+
+
+@app.route("/docs/<path:doc_path>")
+def view_document(doc_path: str):
+    docs_root = os.path.abspath(DEFAULT_DOCS_DIR)
+    safe_doc_path = safe_doc_path_or_404(doc_path)
+    return send_from_directory(docs_root, safe_doc_path)
 
 
 @app.route("/", methods = ['GET', 'POST'])
