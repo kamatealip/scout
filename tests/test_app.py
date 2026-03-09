@@ -3,7 +3,9 @@ import re
 import tempfile
 import unittest
 
-import main
+import app as scout_app
+import indexer
+import search
 
 
 class ScoutAppTests(unittest.TestCase):
@@ -41,25 +43,25 @@ class ScoutAppTests(unittest.TestCase):
             ),
         )
 
-        self.original_docs_dir = main.DEFAULT_DOCS_DIR
-        self.original_index_cache = main.INDEX_CACHE
-        self.original_normalized_index_cache = main.NORMALIZED_INDEX_CACHE
-        self.original_doc_text_cache = main.DOC_TEXT_CACHE
-        self.original_testing = main.app.config.get("TESTING", False)
+        self.original_docs_dir = indexer.DEFAULT_DOCS_DIR
+        self.original_index_cache = indexer.INDEX_CACHE
+        self.original_normalized_index_cache = search.NORMALIZED_INDEX_CACHE
+        self.original_doc_text_cache = indexer.DOC_TEXT_CACHE
+        self.original_testing = scout_app.app.config.get("TESTING", False)
 
-        main.DEFAULT_DOCS_DIR = self.docs_dir
-        main.INDEX_CACHE = self._build_index()
-        main.NORMALIZED_INDEX_CACHE = {}
-        main.DOC_TEXT_CACHE = {}
-        main.app.config["TESTING"] = True
-        self.client = main.app.test_client()
+        indexer.DEFAULT_DOCS_DIR = self.docs_dir
+        indexer.INDEX_CACHE = self._build_index()
+        search.NORMALIZED_INDEX_CACHE = {}
+        indexer.DOC_TEXT_CACHE = {}
+        scout_app.app.config["TESTING"] = True
+        self.client = scout_app.app.test_client()
 
     def tearDown(self):
-        main.DEFAULT_DOCS_DIR = self.original_docs_dir
-        main.INDEX_CACHE = self.original_index_cache
-        main.NORMALIZED_INDEX_CACHE = self.original_normalized_index_cache
-        main.DOC_TEXT_CACHE = self.original_doc_text_cache
-        main.app.config["TESTING"] = self.original_testing
+        indexer.DEFAULT_DOCS_DIR = self.original_docs_dir
+        indexer.INDEX_CACHE = self.original_index_cache
+        search.NORMALIZED_INDEX_CACHE = self.original_normalized_index_cache
+        indexer.DOC_TEXT_CACHE = self.original_doc_text_cache
+        scout_app.app.config["TESTING"] = self.original_testing
         self.tempdir.cleanup()
 
     def _write_doc(self, relative_path: str, content: str):
@@ -83,11 +85,11 @@ class ScoutAppTests(unittest.TestCase):
                     continue
                 full_path = os.path.join(dirpath, filename)
                 file_key = f"{dirpath}/{filename}"
-                counts_by_file[file_key] = main.process_html_file(full_path)
+                counts_by_file[file_key] = indexer.process_html_file(full_path)
         return counts_by_file
 
     def test_prepare_query_terms_filters_stopwords_and_applies_stemming(self):
-        raw_terms, filtered_terms, normalized_terms = main.prepare_query_terms(
+        raw_terms, filtered_terms, normalized_terms = search.prepare_query_terms(
             "The runners are running quickly", use_stemming=True
         )
 
@@ -96,13 +98,13 @@ class ScoutAppTests(unittest.TestCase):
         self.assertEqual(normalized_terms, ["runner", "run", "quick"])
 
     def test_tf_idf_search_prioritizes_exact_phrase_match(self):
-        _, _, normalized_terms = main.prepare_query_terms(
+        _, _, normalized_terms = search.prepare_query_terms(
             "event loop", use_stemming=False
         )
 
-        results = main.tf_idf_search(
+        results = search.tf_idf_search(
             "event loop",
-            main.INDEX_CACHE,
+            indexer.INDEX_CACHE,
             use_stemming=False,
             query_terms=normalized_terms,
         )
@@ -112,13 +114,13 @@ class ScoutAppTests(unittest.TestCase):
         self.assertGreater(results[0]["phrase_hits"], 0)
 
     def test_tf_idf_search_with_stemming_matches_word_variants(self):
-        _, _, normalized_terms = main.prepare_query_terms(
+        _, _, normalized_terms = search.prepare_query_terms(
             "running tasks", use_stemming=True
         )
 
-        results = main.tf_idf_search(
+        results = search.tf_idf_search(
             "running tasks",
-            main.INDEX_CACHE,
+            indexer.INDEX_CACHE,
             use_stemming=True,
             query_terms=normalized_terms,
         )
