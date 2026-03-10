@@ -10,3 +10,8 @@ wheels/
 .venv
 docs
 docs/*
+
+
+# local files 
+click_counts.json
+word_counts.json

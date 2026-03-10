@@ -228,7 +228,7 @@ def attach_result_snippets(results: list[dict[str, object]], query_terms: list[s
 def click_score_boost(click_count: int) -> float:
     if click_count <= 0:
         return 1.0
-    return 1.0 + 0.35 * math.log1p(click_count)
+    return 1.25 + 0.35 * math.log1p(click_count)
 
 
 def tf_idf_search(
@@ -311,6 +311,7 @@ def tf_idf_search(
         score = tf_idf_score * frequency_boost * (1.0 + 0.35 * coverage)
         doc_path = indexer.docs_relative_path(file_key)
         click_count = click_counts.get(doc_path, 0) if doc_path else 0
+        visited_before = click_count > 0
         phrase_hits = 0
         if phrase_regex is not None and doc_path is not None:
             plain_text = indexer.get_document_text(doc_path)
@@ -326,6 +327,7 @@ def tf_idf_search(
                 "doc_path": doc_path,
                 "score": score,
                 "click_count": click_count,
+                "visited_before": visited_before,
                 "matches": ", ".join(matched_terms),
                 "term_hits": term_hits,
                 "coverage": coverage,
@@ -338,6 +340,7 @@ def tf_idf_search(
     ranked_results.sort(
         key=lambda result: (
             -result["score"],
+            -int(result["visited_before"]),
             -result["click_count"],
             -result["term_hits"],
             result["file"],

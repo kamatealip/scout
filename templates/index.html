@@ -111,6 +111,28 @@
         box-shadow: 3px 3px 0 rgba(20, 92, 158, 0.15);
         transform: translate(-1px, -1px);
       }
+      .result-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .result-meta {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        color: var(--primary);
+        font-size: 14px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border: 1px solid var(--primary);
+        background: var(--primary-soft);
+        font-weight: bold;
+      }
       .snippet {
         margin-top: 5px;
         color: var(--text);
@@ -188,11 +210,19 @@
       <ul>
         {% for result in results %}
         <li>
-          {% if result.doc_path %}
-          <a href="{{ url_for('open_result', doc_path=result.doc_path) }}">{{ result.file }}</a>
-          {% else %}
-          {{ result.file }}
-          {% endif %}
+          <div class="result-header">
+            {% if result.doc_path %}
+            <a href="{{ url_for('open_result', doc_path=result.doc_path) }}">{{ result.file }}</a>
+            {% else %}
+            {{ result.file }}
+            {% endif %}
+          </div>
+          <div class="result-meta">
+            {% if result.visited_before %}
+            <span class="badge">Visited before</span>
+            {% endif %}
+            <span>Clicks: {{ result.click_count }}</span>
+          </div>
           {% if result.snippet_html %}
           <div class="snippet">{{ result.snippet_html|safe }}</div>
           {% endif %}

@@ -159,6 +159,7 @@ class ScoutAppTests(unittest.TestCase):
         self.assertEqual(without_clicks[0]["doc_path"], "library/asyncio.html")
         self.assertEqual(with_clicks[0]["doc_path"], "tutorial/terms.html")
         self.assertEqual(with_clicks[0]["click_count"], 100)
+        self.assertTrue(with_clicks[0]["visited_before"])
 
     def test_index_route_renders_search_page(self):
         response = self.client.get("/")
@@ -204,6 +205,21 @@ class ScoutAppTests(unittest.TestCase):
         finally:
             first_response.close()
             second_response.close()
+
+    def test_index_route_shows_visited_status_and_click_count(self):
+        first_response = self.client.get("/result/library/asyncio.html")
+        second_response = self.client.get("/result/library/asyncio.html")
+        response = self.client.post("/", data={"query": "event loop", "section": "library/"})
+        try:
+            html = response.get_data(as_text=True)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("Visited before", html)
+            self.assertIn("Clicks: 2", html)
+        finally:
+            first_response.close()
+            second_response.close()
+            response.close()
 
     def test_docs_route_serves_document(self):
         response = self.client.get("/docs/library/asyncio.html")
