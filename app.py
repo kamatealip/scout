@@ -33,15 +33,10 @@ def decorate_results_for_display(results: list[dict[str, object]]) -> None:
         result["section_label"] = "search index"
 
 
-def build_search_context() -> dict[str, object]:
-    query = ""
-    results = []
+def load_search_page_data() -> dict[str, object]:
     error = None
-    use_stemming = False
-    selected_section = ""
-    selected_section_label = "All docs"
     section_options = [{"value": "", "label": "All docs"}]
-    counts_by_file = None
+    counts_by_file: dict[str, dict[str, int]] | None = None
     document_count = 0
 
     try:
@@ -49,49 +44,71 @@ def build_search_context() -> dict[str, object]:
         document_count = len(counts_by_file)
         section_options = search.section_options_for_index(counts_by_file)
     except FileNotFoundError as exc:
-        if request.method == "POST":
-            error = str(exc)
+        error = str(exc)
 
-    if request.method == "POST":
-        query = request.form.get("query", "").strip()
-        use_stemming = request.form.get("stemming") == "1"
-        selected_section = request.form.get("section", "")
-        section_labels = {
-            option["value"]: option["label"]
-            for option in section_options
-        }
-        if selected_section not in section_labels:
-            selected_section = ""
-        selected_section_label = section_labels.get(selected_section, "All docs")
+    return {
+        "counts_by_file": counts_by_file,
+        "document_count": document_count,
+        "document_count_label": f"{document_count:,}",
+        "section_options": section_options,
+        "error": error,
+    }
 
-        if not query:
-            error = "Enter a query to search."
-        elif counts_by_file is not None:
-            filtered_counts_by_file = search.filter_index_by_section(
-                counts_by_file, selected_section
+
+def build_home_context() -> dict[str, object]:
+    shared = load_search_page_data()
+    return {
+        "document_count": shared["document_count"],
+        "document_count_label": shared["document_count_label"],
+        "error": shared["error"],
+    }
+
+
+def build_search_context(
+    query: str,
+    use_stemming: bool = False,
+    selected_section: str = "",
+) -> dict[str, object]:
+    shared = load_search_page_data()
+    results = []
+    error = shared["error"]
+    counts_by_file = shared["counts_by_file"]
+    section_options = shared["section_options"]
+    selected_section_label = "All docs"
+
+    section_labels = {
+        option["value"]: option["label"]
+        for option in section_options
+    }
+    if selected_section not in section_labels:
+        selected_section = ""
+    selected_section_label = section_labels.get(selected_section, "All docs")
+
+    if counts_by_file is not None:
+        filtered_counts_by_file = search.filter_index_by_section(
+            counts_by_file, selected_section
+        )
+        _, snippet_terms, normalized_query_terms = search.prepare_query_terms(
+            query, use_stemming=use_stemming
+        )
+        if not normalized_query_terms:
+            error = "Query contains only stopwords. Try more specific words."
+        else:
+            results = search.tf_idf_search(
+                query,
+                filtered_counts_by_file,
+                use_stemming=use_stemming,
+                query_terms=normalized_query_terms,
             )
-            _, snippet_terms, normalized_query_terms = search.prepare_query_terms(
-                query, use_stemming=use_stemming
-            )
-            if not normalized_query_terms:
-                error = "Query contains only stopwords. Try more specific words."
-                results = []
-            else:
-                results = search.tf_idf_search(
-                    query,
-                    filtered_counts_by_file,
-                    use_stemming=use_stemming,
-                    query_terms=normalized_query_terms,
-                )
-                search.attach_result_snippets(results, snippet_terms)
-                decorate_results_for_display(results)
+            search.attach_result_snippets(results, snippet_terms)
+            decorate_results_for_display(results)
 
     return {
         "query": query,
         "results": results,
         "use_stemming": use_stemming,
-        "document_count": document_count,
-        "document_count_label": f"{document_count:,}",
+        "document_count": shared["document_count"],
+        "document_count_label": shared["document_count_label"],
         "section_options": section_options,
         "selected_section": selected_section,
         "selected_section_label": selected_section_label,
@@ -130,16 +147,24 @@ def open_result(doc_path: str):
     return redirect(url_for("view_document", doc_path=safe_doc_path))
 
 
-@app.route("/", methods=["GET", "POST"])
-def hello_world():
-    context = build_search_context()
-    is_async_search = (
-        request.method == "POST"
-        and request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    )
-    if is_async_search:
-        return render_template("_search_results.html", **context)
+@app.route("/")
+def home():
+    context = build_home_context()
     return render_template("index.html", **context)
+
+
+@app.route("/search")
+def search_results():
+    query = request.args.get("q", "").strip()
+    if not query:
+        return redirect(url_for("home"))
+
+    context = build_search_context(
+        query=query,
+        use_stemming=request.args.get("stemming") == "1",
+        selected_section=request.args.get("section", ""),
+    )
+    return render_template("search.html", **context)
 
 
 def serve(flask_app=app):
