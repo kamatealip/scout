@@ -25,7 +25,7 @@ def main():
 
 def usage():
     print("SUBCOMMANDS:")
-    print("      INDEX:   [folder path]: Process HTML files and generate word counts")
+    print("      INDEX:   [folder path]: Process HTML files and store word counts in SQLite")
     print("      SERVE: Start the Flask web server")
 
 

@@ -6,9 +6,9 @@ It indexes HTML files (for example, the `docs/` folder), then lets you search an
 
 ## Features
 
-- HTML document indexing into `word_counts.json`
+- HTML document indexing into a SQLite database (`scout.db`)
 - Query-based document ranking (TF-IDF/BM25-style scoring)
-- Click-aware ranking persisted in `click_counts.json`
+- Click-aware ranking persisted in SQLite alongside the search index
 - Clickable search results that open the full document page
 - Minimal web UI for quick local search
 
@@ -51,8 +51,9 @@ python main.py INDEX docs
 
 This generates/updates:
 
-- `word_counts.json` (main index file)
-- `click_counts.json` (created automatically after tracked result clicks)
+- `scout.db` (stores indexed word counts and tracked click counts)
+
+If you already have `word_counts.json`, `index.json`, or `click_counts.json`, Scout will import that legacy data into SQLite the next time it loads.
 
 ## 4. Run the App
 
@@ -77,7 +78,7 @@ Then open:
 - `index_file(...)` walks the target folder recursively.
 - Each HTML file is parsed by `MyHTMLParser`.
 - Only word tokens are counted and normalized to lowercase.
-- Counts are stored per document in `word_counts.json`.
+- Counts are stored per document in the `scout.db` SQLite database.
 
 ### Search phase
 

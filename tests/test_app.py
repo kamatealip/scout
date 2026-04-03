@@ -1,4 +1,3 @@
-import json
 import os
 import re
 import tempfile
@@ -45,16 +44,16 @@ class ScoutAppTests(unittest.TestCase):
         )
 
         self.original_docs_dir = indexer.DEFAULT_DOCS_DIR
+        self.original_database_file = indexer.DATABASE_FILE
         self.original_index_cache = indexer.INDEX_CACHE
-        self.original_click_count_file = indexer.CLICK_COUNT_FILE
         self.original_click_count_cache = indexer.CLICK_COUNT_CACHE
         self.original_normalized_index_cache = search.NORMALIZED_INDEX_CACHE
         self.original_doc_text_cache = indexer.DOC_TEXT_CACHE
         self.original_testing = scout_app.app.config.get("TESTING", False)
-        self.click_count_file = os.path.join(self.tempdir.name, "click_counts.json")
+        self.database_file = os.path.join(self.tempdir.name, "scout.db")
 
         indexer.DEFAULT_DOCS_DIR = self.docs_dir
-        indexer.CLICK_COUNT_FILE = self.click_count_file
+        indexer.DATABASE_FILE = self.database_file
         indexer.INDEX_CACHE = self._build_index()
         indexer.CLICK_COUNT_CACHE = None
         search.NORMALIZED_INDEX_CACHE = {}
@@ -64,8 +63,8 @@ class ScoutAppTests(unittest.TestCase):
 
     def tearDown(self):
         indexer.DEFAULT_DOCS_DIR = self.original_docs_dir
+        indexer.DATABASE_FILE = self.original_database_file
         indexer.INDEX_CACHE = self.original_index_cache
-        indexer.CLICK_COUNT_FILE = self.original_click_count_file
         indexer.CLICK_COUNT_CACHE = self.original_click_count_cache
         search.NORMALIZED_INDEX_CACHE = self.original_normalized_index_cache
         indexer.DOC_TEXT_CACHE = self.original_doc_text_cache
@@ -161,6 +160,38 @@ class ScoutAppTests(unittest.TestCase):
         self.assertEqual(with_clicks[0]["click_count"], 100)
         self.assertTrue(with_clicks[0]["visited_before"])
 
+    def test_index_file_persists_word_counts_in_sqlite(self):
+        expected_index = self._build_index()
+        asyncio_file_key = next(
+            file_key
+            for file_key in expected_index
+            if file_key.endswith("/library/asyncio.html")
+        )
+
+        indexer.INDEX_CACHE = None
+        indexer.index_file(self.docs_dir, output_file=self.database_file)
+        indexer.INDEX_CACHE = None
+
+        loaded_index = indexer.load_index_data()
+
+        self.assertEqual(loaded_index, expected_index)
+
+        with indexer.get_db_connection(self.database_file) as connection:
+            stored_document_count = connection.execute(
+                "SELECT COUNT(*) FROM documents"
+            ).fetchone()[0]
+            stored_event_count = connection.execute(
+                """
+                SELECT count
+                FROM word_counts
+                WHERE file_key = ? AND term = ?
+                """,
+                (asyncio_file_key, "event"),
+            ).fetchone()[0]
+
+        self.assertEqual(stored_document_count, len(expected_index))
+        self.assertEqual(stored_event_count, 3)
+
     def test_index_route_renders_search_page(self):
         response = self.client.get("/")
         try:
@@ -199,8 +230,12 @@ class ScoutAppTests(unittest.TestCase):
             )
             self.assertEqual(indexer.get_click_count("library/asyncio.html"), 2)
 
-            with open(self.click_count_file, "r", encoding="utf-8") as handle:
-                stored_click_counts = json.load(handle)
+            with indexer.get_db_connection(self.database_file) as connection:
+                stored_click_counts = dict(
+                    connection.execute(
+                        "SELECT doc_path, count FROM click_counts ORDER BY doc_path"
+                    )
+                )
             self.assertEqual(stored_click_counts, {"library/asyncio.html": 2})
         finally:
             first_response.close()
