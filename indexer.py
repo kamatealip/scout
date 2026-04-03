@@ -1,4 +1,6 @@
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from html.parser import HTMLParser
 import json
 import os
@@ -113,10 +115,18 @@ def process_html_file(file_path: str) -> dict[str, int]:
     return dict(parser.word_counts)
 
 
-def get_db_connection(database_file: str | None = None) -> sqlite3.Connection:
+@contextmanager
+def get_db_connection(database_file: str | None = None) -> Iterator[sqlite3.Connection]:
     connection = sqlite3.connect(database_file or DATABASE_FILE)
     connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def ensure_database(connection: sqlite3.Connection) -> None:
