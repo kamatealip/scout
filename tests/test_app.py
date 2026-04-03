@@ -207,6 +207,7 @@ class ScoutAppTests(unittest.TestCase):
             self.assertIn("Documentation Search", html)
             self.assertIn('name="section"', html)
             self.assertIn('id="results-region"', html)
+            self.assertIn('/static/styles.css', html)
             self.assertIn("Getting info...", html)
         finally:
             response.close()
