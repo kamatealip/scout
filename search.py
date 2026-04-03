@@ -1,4 +1,5 @@
 from collections import Counter
+from dataclasses import dataclass
 import html
 import math
 import re
@@ -6,6 +7,8 @@ import re
 import indexer
 
 NORMALIZED_INDEX_CACHE: dict[tuple[int, bool], dict[str, dict[str, int]]] = {}
+SECTION_FILTER_CACHE: dict[tuple[int, str], dict[str, dict[str, int]]] = {}
+CORPUS_STATS_CACHE: dict[tuple[int, bool], "CorpusStats"] = {}
 STOPWORDS = {
     "a",
     "an",
@@ -38,6 +41,14 @@ STOPWORDS = {
     "will",
     "with",
 }
+
+
+@dataclass(slots=True)
+class CorpusStats:
+    search_counts_by_file: dict[str, dict[str, int]]
+    doc_lengths: dict[str, int]
+    avg_doc_length: float
+    doc_frequency: dict[str, int]
 
 
 def simple_stem(token: str) -> str:
@@ -137,6 +148,11 @@ def filter_index_by_section(
     if not selected_section:
         return counts_by_file
 
+    cache_key = (id(counts_by_file), selected_section)
+    cached = SECTION_FILTER_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
     filtered_counts: dict[str, dict[str, int]] = {}
     for file_key, term_counts in counts_by_file.items():
         doc_path = indexer.docs_relative_path(file_key)
@@ -148,7 +164,41 @@ def filter_index_by_section(
             continue
         if doc_path.startswith(selected_section):
             filtered_counts[file_key] = term_counts
+    SECTION_FILTER_CACHE[cache_key] = filtered_counts
     return filtered_counts
+
+
+def corpus_stats(
+    counts_by_file: dict[str, dict[str, int]], use_stemming: bool
+) -> CorpusStats:
+    cache_key = (id(counts_by_file), use_stemming)
+    cached = CORPUS_STATS_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    search_counts_by_file = normalized_index_data(
+        counts_by_file, use_stemming=use_stemming
+    )
+    doc_lengths: dict[str, int] = {}
+    doc_frequency_counter = Counter()
+    total_doc_length = 0
+
+    for file_key, term_counts in search_counts_by_file.items():
+        doc_length = sum(term_counts.values())
+        doc_lengths[file_key] = doc_length
+        total_doc_length += doc_length
+        doc_frequency_counter.update(term_counts.keys())
+
+    document_count = len(search_counts_by_file)
+    avg_doc_length = total_doc_length / document_count if document_count else 0.0
+    stats = CorpusStats(
+        search_counts_by_file=search_counts_by_file,
+        doc_lengths=doc_lengths,
+        avg_doc_length=avg_doc_length,
+        doc_frequency=dict(doc_frequency_counter),
+    )
+    CORPUS_STATS_CACHE[cache_key] = stats
+    return stats
 
 
 def build_query_term_regex(query_terms: list[str]) -> re.Pattern | None:
@@ -244,10 +294,9 @@ def tf_idf_search(
     if not query_terms:
         return []
 
-    search_counts_by_file = normalized_index_data(
-        counts_by_file, use_stemming=use_stemming
-    )
-    document_count = len(counts_by_file)
+    stats = corpus_stats(counts_by_file, use_stemming=use_stemming)
+    search_counts_by_file = stats.search_counts_by_file
+    document_count = len(search_counts_by_file)
     if document_count == 0:
         return []
     if click_counts is None:
@@ -263,17 +312,8 @@ def tf_idf_search(
             re.IGNORECASE,
         )
 
-    doc_frequency: dict[str, int] = {}
-    for term in unique_query_terms:
-        doc_frequency[term] = sum(
-            1 for term_counts in search_counts_by_file.values() if term in term_counts
-        )
-
-    doc_lengths = {
-        file_key: sum(term_counts.values())
-        for file_key, term_counts in search_counts_by_file.items()
-    }
-    avg_doc_length = sum(doc_lengths.values()) / document_count
+    doc_lengths = stats.doc_lengths
+    avg_doc_length = stats.avg_doc_length or 1.0
 
     ranked_results = []
     k1 = 1.5
@@ -298,7 +338,10 @@ def tf_idf_search(
             tf_component = (term_count * (k1 + 1.0)) / (term_count + k1 * length_norm)
             idf = math.log(
                 1.0
-                + ((document_count - doc_frequency[term] + 0.5) / (doc_frequency[term] + 0.5))
+                + (
+                    (document_count - stats.doc_frequency.get(term, 0) + 0.5)
+                    / (stats.doc_frequency.get(term, 0) + 0.5)
+                )
             )
             tf_idf_score += query_weight * tf_component * idf
             matched_terms.append(f"{term} ({term_count})")
@@ -312,13 +355,6 @@ def tf_idf_search(
         doc_path = indexer.docs_relative_path(file_key)
         click_count = click_counts.get(doc_path, 0) if doc_path else 0
         visited_before = click_count > 0
-        phrase_hits = 0
-        if phrase_regex is not None and doc_path is not None:
-            plain_text = indexer.get_document_text(doc_path)
-            if plain_text:
-                phrase_hits = len(phrase_regex.findall(plain_text))
-                if phrase_hits > 0:
-                    score *= 1.0 + min(0.5, 0.2 * phrase_hits)
         score *= click_score_boost(click_count)
 
         ranked_results.append(
@@ -333,7 +369,7 @@ def tf_idf_search(
                 "coverage": coverage,
                 "matched_term_count": unique_matches,
                 "query_term_count": len(unique_query_terms),
-                "phrase_hits": phrase_hits,
+                "phrase_hits": 0,
             }
         )
 
@@ -346,4 +382,31 @@ def tf_idf_search(
             result["file"],
         )
     )
+
+    if phrase_regex is not None:
+        phrase_candidate_limit = min(len(ranked_results), max(limit * 4, 40))
+        for result in ranked_results[:phrase_candidate_limit]:
+            doc_path = result.get("doc_path")
+            if not isinstance(doc_path, str):
+                continue
+
+            plain_text = indexer.get_document_text(doc_path)
+            if not plain_text:
+                continue
+
+            phrase_hits = len(phrase_regex.findall(plain_text))
+            result["phrase_hits"] = phrase_hits
+            if phrase_hits > 0:
+                result["score"] *= 1.0 + min(0.5, 0.2 * phrase_hits)
+
+        ranked_results.sort(
+            key=lambda result: (
+                -result["score"],
+                -int(result["visited_before"]),
+                -result["click_count"],
+                -result["term_hits"],
+                result["file"],
+            )
+        )
+
     return ranked_results[:limit]

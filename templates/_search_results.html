@@ -1,0 +1,36 @@
+{% if error %}
+<p class="message">{{ error }}</p>
+{% endif %} {% if query and results %}
+<p class="message">
+  Showing <strong>{{ results|length }}</strong> result{% if results|length != 1 %}s{% endif %}
+  for "<strong>{{ query }}</strong>" in
+  "<strong>{{ selected_section_label }}</strong>".
+</p>
+<ul class="results">
+  {% for result in results %}
+  <li class="card result-card">
+    {% if result.doc_path %}
+    <a class="result-link" href="{{ url_for('open_result', doc_path=result.doc_path) }}"
+      >{{ result.file }}</a
+    >
+    {% else %}
+    <span class="result-link">{{ result.file }}</span>
+    {% endif %}
+    <div class="result-meta">
+      <span class="chip">Clicks: {{ result.click_count }}</span>
+      {% if result.visited_before %}
+      <span class="chip">Visited before</span>
+      {% endif %}
+    </div>
+    {% if result.snippet_html %}
+    <div class="snippet">{{ result.snippet_html|safe }}</div>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% elif query and not error %}
+<p class="message">
+  No relevant links found for "<strong>{{ query }}</strong>" in
+  "<strong>{{ selected_section_label }}</strong>".
+</p>
+{% endif %}

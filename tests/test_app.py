@@ -48,6 +48,8 @@ class ScoutAppTests(unittest.TestCase):
         self.original_index_cache = indexer.INDEX_CACHE
         self.original_click_count_cache = indexer.CLICK_COUNT_CACHE
         self.original_normalized_index_cache = search.NORMALIZED_INDEX_CACHE
+        self.original_section_filter_cache = search.SECTION_FILTER_CACHE
+        self.original_corpus_stats_cache = search.CORPUS_STATS_CACHE
         self.original_doc_text_cache = indexer.DOC_TEXT_CACHE
         self.original_testing = scout_app.app.config.get("TESTING", False)
         self.database_file = os.path.join(self.tempdir.name, "scout.db")
@@ -57,6 +59,8 @@ class ScoutAppTests(unittest.TestCase):
         indexer.INDEX_CACHE = self._build_index()
         indexer.CLICK_COUNT_CACHE = None
         search.NORMALIZED_INDEX_CACHE = {}
+        search.SECTION_FILTER_CACHE = {}
+        search.CORPUS_STATS_CACHE = {}
         indexer.DOC_TEXT_CACHE = {}
         scout_app.app.config["TESTING"] = True
         self.client = scout_app.app.test_client()
@@ -67,6 +71,8 @@ class ScoutAppTests(unittest.TestCase):
         indexer.INDEX_CACHE = self.original_index_cache
         indexer.CLICK_COUNT_CACHE = self.original_click_count_cache
         search.NORMALIZED_INDEX_CACHE = self.original_normalized_index_cache
+        search.SECTION_FILTER_CACHE = self.original_section_filter_cache
+        search.CORPUS_STATS_CACHE = self.original_corpus_stats_cache
         indexer.DOC_TEXT_CACHE = self.original_doc_text_cache
         scout_app.app.config["TESTING"] = self.original_testing
         self.tempdir.cleanup()
@@ -200,8 +206,18 @@ class ScoutAppTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn("Documentation Search", html)
             self.assertIn('name="section"', html)
+            self.assertIn('id="results-region"', html)
+            self.assertIn("Getting info...", html)
         finally:
             response.close()
+
+    def test_search_corpus_stats_are_cached(self):
+        stats = search.corpus_stats(indexer.INDEX_CACHE, use_stemming=False)
+        cached_stats = search.corpus_stats(indexer.INDEX_CACHE, use_stemming=False)
+
+        self.assertIs(stats, cached_stats)
+        self.assertGreater(stats.avg_doc_length, 0)
+        self.assertIn("event", stats.doc_frequency)
 
     def test_index_route_post_filters_results_by_section(self):
         response = self.client.post(
@@ -216,6 +232,21 @@ class ScoutAppTests(unittest.TestCase):
             self.assertIn("/result/library/asyncio.html", doc_hrefs)
             self.assertTrue(all(href.startswith("/result/library/") for href in doc_hrefs))
             self.assertIn('class="snippet"', html)
+        finally:
+            response.close()
+
+    def test_index_route_post_returns_results_fragment_for_ajax_search(self):
+        response = self.client.post(
+            "/",
+            data={"query": "event loop", "section": "library/"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        try:
+            html = response.get_data(as_text=True)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("/result/library/asyncio.html", html)
+            self.assertNotIn("<!doctype html>", html.lower())
         finally:
             response.close()
 

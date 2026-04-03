@@ -146,6 +146,25 @@
       .message strong {
         color: var(--foreground);
       }
+      .message-loading {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .message-loading::before {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--border);
+        border-top-color: var(--foreground);
+        border-radius: 999px;
+        animation: spin 700ms linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
       .results {
         margin: 0;
         padding: 0;
@@ -260,42 +279,70 @@
         </form>
       </div>
 
-      {% if error %}
-      <p class="message">{{ error }}</p>
-      {% endif %} {% if query and results %}
-      <p class="message">
-        Showing <strong>{{ results|length }}</strong> result{% if results|length != 1 %}s{% endif %}
-        for "<strong>{{ query }}</strong>" in
-        "<strong>{{ selected_section_label }}</strong>".
-      </p>
-      <ul class="results">
-        {% for result in results %}
-        <li class="card result-card">
-          {% if result.doc_path %}
-          <a class="result-link" href="{{ url_for('open_result', doc_path=result.doc_path) }}"
-            >{{ result.file }}</a
-          >
-          {% else %}
-          <span class="result-link">{{ result.file }}</span>
-          {% endif %}
-          <div class="result-meta">
-            <span class="chip">Clicks: {{ result.click_count }}</span>
-            {% if result.visited_before %}
-            <span class="chip">Visited before</span>
-            {% endif %}
-          </div>
-          {% if result.snippet_html %}
-          <div class="snippet">{{ result.snippet_html|safe }}</div>
-          {% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-      {% elif query and not error %}
-      <p class="message">
-        No relevant links found for "<strong>{{ query }}</strong>" in
-        "<strong>{{ selected_section_label }}</strong>".
-      </p>
-      {% endif %}
+      <section id="results-region" aria-live="polite">
+        {% include "_search_results.html" %}
+      </section>
     </section>
+    <script>
+      (() => {
+        const form = document.querySelector(".search-form");
+        const resultsRegion = document.getElementById("results-region");
+        const submitButton = form?.querySelector('button[type="submit"]');
+        if (!form || !resultsRegion || !window.fetch) {
+          return;
+        }
+
+        let activeController = null;
+        const defaultButtonText = submitButton?.textContent ?? "Search";
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+
+          activeController?.abort();
+          const requestController = new AbortController();
+          activeController = requestController;
+
+          if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = "Getting info...";
+          }
+          resultsRegion.innerHTML =
+            '<p class="message message-loading">Getting info...</p>';
+
+          try {
+            const response = await fetch(form.action || window.location.pathname, {
+              method: "POST",
+              body: new FormData(form),
+              headers: { "X-Requested-With": "XMLHttpRequest" },
+              signal: requestController.signal,
+            });
+
+            if (!response.ok) {
+              throw new Error("Search request failed");
+            }
+
+            if (activeController === requestController) {
+              resultsRegion.innerHTML = await response.text();
+            }
+          } catch (error) {
+            if (error.name === "AbortError") {
+              return;
+            }
+            if (activeController === requestController) {
+              resultsRegion.innerHTML =
+                '<p class="message">Could not fetch documents right now. Please try again.</p>';
+            }
+          } finally {
+            if (submitButton && activeController === requestController) {
+              submitButton.disabled = false;
+              submitButton.textContent = defaultButtonText;
+            }
+            if (activeController === requestController) {
+              activeController = null;
+            }
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
