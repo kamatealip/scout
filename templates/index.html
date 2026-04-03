@@ -3,92 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Documentation Search</title>
+    <title>Scout Search</title>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='styles.css') }}"
     />
   </head>
-  <body>
-    <section class="shell">
-      <header class="masthead card">
-        <p class="eyebrow">Local Search Portal</p>
-        <h1>Documentation Search</h1>
-        <p class="masthead-meta">
+  <body class="home-page">
+    <main class="home-shell">
+      <div class="home-brand">
+        <a class="scout-logo scout-logo-large" href="{{ url_for('home') }}">Scout</a>
+        <p class="home-subtitle">
           Search <strong>{{ document_count_label }}</strong> local doc{% if document_count != 1 %}s{% endif %}
+          from one simple index.
         </p>
-        <p class="intro">
-          Fast offline doc finder for indexed HTML manuals, notes, and generated docs.
-        </p>
-      </header>
-
-      <div class="card search-card">
-        <form method="POST" class="search-form">
-          <label class="field search-primary" for="query">
-            <span class="field-label">Search Terms</span>
-            <input
-              type="text"
-              name="query"
-              id="query"
-              placeholder="Search your docs"
-              value="{{ query }}"
-              autofocus
-              autocomplete="off"
-              aria-describedby="query-help"
-            />
-            <p id="query-help" class="field-help">
-              Try: async loop, task orchestration, callbacks
-            </p>
-          </label>
-          <div class="search-secondary">
-            <label class="field" for="section">
-              <span class="field-label">Section</span>
-              <select name="section" id="section">
-                {% for option in section_options %}
-                <option
-                  value="{{ option.value }}"
-                  {% if option.value == selected_section %}
-                  selected
-                  {% endif %}
-                >
-                  {{ option.label }}
-                </option>
-                {% endfor %}
-              </select>
-            </label>
-            <div class="actions">
-              <label class="option" for="stemming">
-                <input
-                  type="checkbox"
-                  id="stemming"
-                  name="stemming"
-                  value="1"
-                  {% if use_stemming %}
-                  checked
-                  {% endif %}
-                />
-                Use stemming
-              </label>
-              <button type="submit">Search</button>
-            </div>
-          </div>
-        </form>
       </div>
 
-      <section
-        id="results-region"
-        aria-live="polite"
-        data-loading-title="Getting info from indexed documents..."
-        data-loading-hint="Matching paths, snippets, and click history."
-        data-error-title="Could not fetch documents right now."
-        data-error-hint="Please try the search again in a moment."
-      >
-        {% include "_search_results.html" %}
-      </section>
-    </section>
-    <script
-      src="{{ url_for('static', filename='app.js') }}"
-      defer
-    ></script>
+      <form action="{{ url_for('search_results') }}" method="GET" class="home-search-form">
+        <label class="visually-hidden" for="home-query">Search your docs</label>
+        <input
+          type="text"
+          name="q"
+          id="home-query"
+          class="home-search-input"
+          placeholder="Search Scout"
+          autofocus
+          autocomplete="off"
+          aria-describedby="home-help"
+        />
+        <button type="submit" class="home-search-button">Scout Search</button>
+      </form>
+
+      <p id="home-help" class="home-help">
+        Try: async loop, task orchestration, callbacks
+      </p>
+
+      {% if error %}
+      <div class="message message-state home-message">
+        <strong class="message-title">{{ error }}</strong>
+        <span class="message-hint">Run an index first, then search again.</span>
+      </div>
+      {% endif %}
+    </main>
   </body>
 </html>

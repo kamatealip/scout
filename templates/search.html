@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ query }} - Scout Search</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+  <body class="results-page">
+    <header class="results-topbar">
+      <div class="results-topbar-inner">
+        <a class="scout-logo scout-logo-small" href="{{ url_for('home') }}">Scout</a>
+        <form action="{{ url_for('search_results') }}" method="GET" class="results-search-form">
+          <div class="results-search-row">
+            <label class="visually-hidden" for="results-query">Search your docs</label>
+            <input
+              type="text"
+              name="q"
+              id="results-query"
+              class="results-search-input"
+              value="{{ query }}"
+              placeholder="Search Scout"
+              autofocus
+              autocomplete="off"
+            />
+            <button type="submit" class="results-search-button">Search</button>
+          </div>
+          <div class="results-tools-row">
+            <label class="field results-field" for="section">
+              <span class="field-label">Section</span>
+              <select name="section" id="section">
+                {% for option in section_options %}
+                <option
+                  value="{{ option.value }}"
+                  {% if option.value == selected_section %}
+                  selected
+                  {% endif %}
+                >
+                  {{ option.label }}
+                </option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="option results-option" for="stemming">
+              <input
+                type="checkbox"
+                id="stemming"
+                name="stemming"
+                value="1"
+                {% if use_stemming %}
+                checked
+                {% endif %}
+              />
+              Use stemming
+            </label>
+            <p class="results-count">
+              {{ document_count_label }} indexed doc{% if document_count != 1 %}s{% endif %}
+            </p>
+          </div>
+        </form>
+      </div>
+    </header>
+
+    <main class="results-shell">
+      <section class="results-region">
+        {% include "_search_results.html" %}
+      </section>
+    </main>
+  </body>
+</html>
