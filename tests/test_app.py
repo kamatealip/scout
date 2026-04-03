@@ -208,7 +208,12 @@ class ScoutAppTests(unittest.TestCase):
             self.assertIn('name="section"', html)
             self.assertIn('id="results-region"', html)
             self.assertIn('/static/styles.css', html)
-            self.assertIn("Getting info...", html)
+            self.assertIn('/static/app.js', html)
+            self.assertIn("Search <strong>4</strong> local docs", html)
+            self.assertIn("Fast offline doc finder", html)
+            self.assertIn("Try: async loop, task orchestration", html)
+            self.assertIn("Getting info from indexed documents...", html)
+            self.assertIn("autofocus", html)
         finally:
             response.close()
 
@@ -233,6 +238,8 @@ class ScoutAppTests(unittest.TestCase):
             self.assertIn("/result/library/asyncio.html", doc_hrefs)
             self.assertTrue(all(href.startswith("/result/library/") for href in doc_hrefs))
             self.assertIn('class="snippet"', html)
+            self.assertIn("docs/library/asyncio.html", html)
+            self.assertIn('class="section-tag"', html)
         finally:
             response.close()
 

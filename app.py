@@ -16,6 +16,23 @@ import search
 app = Flask(__name__)
 
 
+def decorate_results_for_display(results: list[dict[str, object]]) -> None:
+    for result in results:
+        doc_path = result.get("doc_path")
+        file_key = result.get("file")
+        if isinstance(doc_path, str) and doc_path:
+            directory = doc_path.rsplit("/", 1)[0] if "/" in doc_path else ""
+            result["display_title"] = doc_path.rsplit("/", 1)[-1]
+            result["display_path"] = f"docs/{doc_path}"
+            result["section_label"] = f"docs/{directory}" if directory else "docs root"
+            continue
+
+        fallback_path = str(file_key) if file_key is not None else "Unknown document"
+        result["display_title"] = fallback_path
+        result["display_path"] = fallback_path
+        result["section_label"] = "search index"
+
+
 def build_search_context() -> dict[str, object]:
     query = ""
     results = []
@@ -25,9 +42,11 @@ def build_search_context() -> dict[str, object]:
     selected_section_label = "All docs"
     section_options = [{"value": "", "label": "All docs"}]
     counts_by_file = None
+    document_count = 0
 
     try:
         counts_by_file = indexer.load_index_data()
+        document_count = len(counts_by_file)
         section_options = search.section_options_for_index(counts_by_file)
     except FileNotFoundError as exc:
         if request.method == "POST":
@@ -65,11 +84,14 @@ def build_search_context() -> dict[str, object]:
                     query_terms=normalized_query_terms,
                 )
                 search.attach_result_snippets(results, snippet_terms)
+                decorate_results_for_display(results)
 
     return {
         "query": query,
         "results": results,
         "use_stemming": use_stemming,
+        "document_count": document_count,
+        "document_count_label": f"{document_count:,}",
         "section_options": section_options,
         "selected_section": selected_section,
         "selected_section_label": selected_section_label,

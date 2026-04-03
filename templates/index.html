@@ -14,8 +14,11 @@
       <header class="masthead card">
         <p class="eyebrow">Local Search Portal</p>
         <h1>Documentation Search</h1>
+        <p class="masthead-meta">
+          Search <strong>{{ document_count_label }}</strong> local doc{% if document_count != 1 %}s{% endif %}
+        </p>
         <p class="intro">
-          Search through your docs with a simple browser-style page and quick results.
+          Fast offline doc finder for indexed HTML manuals, notes, and generated docs.
         </p>
       </header>
 
@@ -29,7 +32,13 @@
               id="query"
               placeholder="Search your docs"
               value="{{ query }}"
+              autofocus
+              autocomplete="off"
+              aria-describedby="query-help"
             />
+            <p id="query-help" class="field-help">
+              Try: async loop, task orchestration, callbacks
+            </p>
           </label>
           <div class="search-secondary">
             <label class="field" for="section">
@@ -66,70 +75,20 @@
         </form>
       </div>
 
-      <section id="results-region" aria-live="polite">
+      <section
+        id="results-region"
+        aria-live="polite"
+        data-loading-title="Getting info from indexed documents..."
+        data-loading-hint="Matching paths, snippets, and click history."
+        data-error-title="Could not fetch documents right now."
+        data-error-hint="Please try the search again in a moment."
+      >
         {% include "_search_results.html" %}
       </section>
     </section>
-    <script>
-      (() => {
-        const form = document.querySelector(".search-form");
-        const resultsRegion = document.getElementById("results-region");
-        const submitButton = form?.querySelector('button[type="submit"]');
-        if (!form || !resultsRegion || !window.fetch) {
-          return;
-        }
-
-        let activeController = null;
-        const defaultButtonText = submitButton?.textContent ?? "Search";
-
-        form.addEventListener("submit", async (event) => {
-          event.preventDefault();
-
-          activeController?.abort();
-          const requestController = new AbortController();
-          activeController = requestController;
-
-          if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = "Getting info...";
-          }
-          resultsRegion.innerHTML =
-            '<p class="message message-loading">Getting info...</p>';
-
-          try {
-            const response = await fetch(form.action || window.location.pathname, {
-              method: "POST",
-              body: new FormData(form),
-              headers: { "X-Requested-With": "XMLHttpRequest" },
-              signal: requestController.signal,
-            });
-
-            if (!response.ok) {
-              throw new Error("Search request failed");
-            }
-
-            if (activeController === requestController) {
-              resultsRegion.innerHTML = await response.text();
-            }
-          } catch (error) {
-            if (error.name === "AbortError") {
-              return;
-            }
-            if (activeController === requestController) {
-              resultsRegion.innerHTML =
-                '<p class="message">Could not fetch documents right now. Please try again.</p>';
-            }
-          } finally {
-            if (submitButton && activeController === requestController) {
-              submitButton.disabled = false;
-              submitButton.textContent = defaultButtonText;
-            }
-            if (activeController === requestController) {
-              activeController = null;
-            }
-          }
-        });
-      })();
-    </script>
+    <script
+      src="{{ url_for('static', filename='app.js') }}"
+      defer
+    ></script>
   </body>
 </html>

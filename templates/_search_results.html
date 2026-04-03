@@ -1,21 +1,34 @@
 {% if error %}
-<p class="message">{{ error }}</p>
+<div class="message message-state">
+  <strong class="message-title">{{ error }}</strong>
+  <span class="message-hint">Check that the search index is available, then try again.</span>
+</div>
 {% endif %} {% if query and results %}
-<p class="message">
-  Showing <strong>{{ results|length }}</strong> result{% if results|length != 1 %}s{% endif %}
-  for "<strong>{{ query }}</strong>" in
-  "<strong>{{ selected_section_label }}</strong>".
-</p>
+<div class="message message-state">
+  <strong class="message-title"
+    >Showing {{ results|length }} result{% if results|length != 1 %}s{% endif %}
+    for "{{ query }}" in {{ selected_section_label }}</strong
+  >
+  <span class="message-hint"
+    >Ranked by term match, phrase hits, and your previous visits.</span
+  >
+</div>
 <ul class="results">
   {% for result in results %}
   <li class="card result-card">
-    {% if result.doc_path %}
-    <a class="result-link" href="{{ url_for('open_result', doc_path=result.doc_path) }}"
-      >{{ result.file }}</a
-    >
-    {% else %}
-    <span class="result-link">{{ result.file }}</span>
-    {% endif %}
+    <div class="result-header">
+      <div class="result-headline">
+        {% if result.doc_path %}
+        <a class="result-link" href="{{ url_for('open_result', doc_path=result.doc_path) }}"
+          >{{ result.display_title }}</a
+        >
+        {% else %}
+        <span class="result-link">{{ result.display_title }}</span>
+        {% endif %}
+        <p class="result-path">{{ result.display_path }}</p>
+      </div>
+      <span class="section-tag">{{ result.section_label }}</span>
+    </div>
     <div class="result-meta">
       <span class="chip">Clicks: {{ result.click_count }}</span>
       {% if result.visited_before %}
@@ -29,8 +42,19 @@
   {% endfor %}
 </ul>
 {% elif query and not error %}
-<p class="message">
-  No relevant links found for "<strong>{{ query }}</strong>" in
-  "<strong>{{ selected_section_label }}</strong>".
-</p>
+<div class="message message-state">
+  <strong class="message-title"
+    >No indexed documents matched "{{ query }}" in {{ selected_section_label }}.</strong
+  >
+  <span class="message-hint"
+    >Try fewer words, switch sections, or turn on stemming for broader matches.</span
+  >
+</div>
+{% else %}
+<div class="message message-state">
+  <strong class="message-title">Ready to search your local docs.</strong>
+  <span class="message-hint"
+    >Try: async loop, task orchestration, callbacks, sockets.</span
+  >
+</div>
 {% endif %}
