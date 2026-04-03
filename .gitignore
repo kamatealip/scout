@@ -14,5 +14,7 @@ docs/*
 
 # local files 
 scout.db
-click_counts.json
-word_counts.json
+
+
+# ai stuff 
+.codex

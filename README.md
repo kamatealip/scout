@@ -53,8 +53,6 @@ This generates/updates:
 
 - `scout.db` (stores indexed word counts and tracked click counts)
 
-If you already have `word_counts.json`, `index.json`, or `click_counts.json`, Scout will import that legacy data into SQLite the next time it loads.
-
 ## 4. Run the App
 
 ```bash

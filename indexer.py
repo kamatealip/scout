@@ -2,15 +2,11 @@ from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
 from html.parser import HTMLParser
-import json
 import os
 import re
 import sqlite3
 
 DATABASE_FILE = "scout.db"
-LEGACY_INDEX_FILE = "index.json"
-LEGACY_WORD_COUNT_FILE = "word_counts.json"
-LEGACY_CLICK_COUNT_FILE = "click_counts.json"
 DEFAULT_DOCS_DIR = "docs"
 WORD_REGEX = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
 INDEX_CACHE: dict[str, dict[str, int]] | None = None
@@ -256,17 +252,6 @@ def load_index_data_from_database(
     return counts_by_file
 
 
-def load_legacy_index_data() -> dict[str, dict[str, int]] | None:
-    for candidate in (LEGACY_WORD_COUNT_FILE, LEGACY_INDEX_FILE):
-        if not os.path.exists(candidate):
-            continue
-        with open(candidate, "r", encoding="utf-8") as source_file:
-            legacy_counts_by_file = json.load(source_file)
-        return save_index_data(legacy_counts_by_file)
-
-    return None
-
-
 def load_index_data() -> dict[str, dict[str, int]]:
     global INDEX_CACHE
     if INDEX_CACHE is not None:
@@ -275,11 +260,6 @@ def load_index_data() -> dict[str, dict[str, int]]:
     database_counts_by_file = load_index_data_from_database()
     if database_counts_by_file is not None:
         INDEX_CACHE = database_counts_by_file
-        return INDEX_CACHE
-
-    legacy_counts_by_file = load_legacy_index_data()
-    if legacy_counts_by_file is not None:
-        INDEX_CACHE = legacy_counts_by_file
         return INDEX_CACHE
 
     if os.path.isdir(DEFAULT_DOCS_DIR):
@@ -308,29 +288,14 @@ def load_click_counts_from_database(
         }
 
 
-def load_legacy_click_counts() -> dict[str, int] | None:
-    if not os.path.exists(LEGACY_CLICK_COUNT_FILE):
-        return None
-
-    with open(LEGACY_CLICK_COUNT_FILE, "r", encoding="utf-8") as source_file:
-        raw_click_counts = json.load(source_file)
-
-    return save_click_counts(raw_click_counts)
-
-
 def load_click_counts() -> dict[str, int]:
     global CLICK_COUNT_CACHE
     if CLICK_COUNT_CACHE is not None:
         return CLICK_COUNT_CACHE
 
     database_click_counts = load_click_counts_from_database()
-    if database_click_counts:
+    if database_click_counts is not None:
         CLICK_COUNT_CACHE = database_click_counts
-        return CLICK_COUNT_CACHE
-
-    legacy_click_counts = load_legacy_click_counts()
-    if legacy_click_counts is not None:
-        CLICK_COUNT_CACHE = legacy_click_counts
         return CLICK_COUNT_CACHE
 
     CLICK_COUNT_CACHE = database_click_counts or {}
