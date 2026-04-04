@@ -12,7 +12,9 @@
   <body class="home-page">
     <main class="home-shell">
       <div class="home-brand">
-        <a class="scout-logo scout-logo-large" href="{{ url_for('home') }}">Scout</a>
+        <a class="scout-logo scout-logo-large" href="{{ url_for('home') }}" aria-label="Scout">
+          <span class="scout-logo-letter scout-logo-letter-blue">S</span><span class="scout-logo-letter scout-logo-letter-red">c</span><span class="scout-logo-letter scout-logo-letter-yellow">o</span><span class="scout-logo-letter scout-logo-letter-blue">u</span><span class="scout-logo-letter scout-logo-letter-green">t</span>
+        </a>
         <p class="home-subtitle">
           Search <strong>{{ document_count_label }}</strong> local doc{% if document_count != 1 %}s{% endif %}
           from one simple index.

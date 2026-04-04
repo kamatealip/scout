@@ -12,7 +12,9 @@
   <body class="results-page">
     <header class="results-topbar">
       <div class="results-topbar-inner">
-        <a class="scout-logo scout-logo-small" href="{{ url_for('home') }}">Scout</a>
+        <a class="scout-logo scout-logo-small" href="{{ url_for('home') }}" aria-label="Scout">
+          <span class="scout-logo-letter scout-logo-letter-blue">S</span><span class="scout-logo-letter scout-logo-letter-red">c</span><span class="scout-logo-letter scout-logo-letter-yellow">o</span><span class="scout-logo-letter scout-logo-letter-blue">u</span><span class="scout-logo-letter scout-logo-letter-green">t</span>
+        </a>
         <form action="{{ url_for('search_results') }}" method="GET" class="results-search-form">
           <div class="results-search-row">
             <label class="visually-hidden" for="results-query">Search your docs</label>
