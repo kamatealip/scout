@@ -6,7 +6,7 @@
 {% endif %} {% if query and results %}
 <div class="message message-state">
   <strong class="message-title"
-    >Showing {{ results|length }} result{% if results|length != 1 %}s{% endif %}
+    >Scout found {{ results|length }} result{% if results|length != 1 %}s{% endif %}
     for "{{ query }}" in {{ selected_section_label }}</strong
   >
   <span class="message-hint"
@@ -15,7 +15,7 @@
 </div>
 <ul class="results">
   {% for result in results %}
-  <li class="card result-card">
+  <li class="result-card">
     <div class="result-header">
       <div class="result-headline">
         {% if result.doc_path %}

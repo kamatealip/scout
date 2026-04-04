@@ -198,21 +198,19 @@ class ScoutAppTests(unittest.TestCase):
         self.assertEqual(stored_document_count, len(expected_index))
         self.assertEqual(stored_event_count, 3)
 
-    def test_index_route_renders_search_page(self):
+    def test_index_route_renders_home_page(self):
         response = self.client.get("/")
         try:
             html = response.get_data(as_text=True)
 
             self.assertEqual(response.status_code, 200)
-            self.assertIn("Documentation Search", html)
-            self.assertIn('name="section"', html)
-            self.assertIn('id="results-region"', html)
+            self.assertIn("Scout", html)
+            self.assertIn('action="/search"', html)
+            self.assertIn('name="q"', html)
+            self.assertNotIn('name="section"', html)
             self.assertIn('/static/styles.css', html)
-            self.assertIn('/static/app.js', html)
             self.assertIn("Search <strong>4</strong> local docs", html)
-            self.assertIn("Fast offline doc finder", html)
             self.assertIn("Try: async loop, task orchestration", html)
-            self.assertIn("Getting info from indexed documents...", html)
             self.assertIn("autofocus", html)
         finally:
             response.close()
@@ -225,11 +223,16 @@ class ScoutAppTests(unittest.TestCase):
         self.assertGreater(stats.avg_doc_length, 0)
         self.assertIn("event", stats.doc_frequency)
 
-    def test_index_route_post_filters_results_by_section(self):
-        response = self.client.post(
-            "/",
-            data={"query": "event loop", "section": "library/"},
-        )
+    def test_search_route_redirects_home_without_query(self):
+        response = self.client.get("/search")
+        try:
+            self.assertEqual(response.status_code, 302)
+            self.assertTrue(response.headers["Location"].endswith("/"))
+        finally:
+            response.close()
+
+    def test_search_route_filters_results_by_section(self):
+        response = self.client.get("/search?q=event+loop&section=library/")
         try:
             html = response.get_data(as_text=True)
             doc_hrefs = re.findall(r'href="(/result/[^"]+)"', html)
@@ -240,21 +243,22 @@ class ScoutAppTests(unittest.TestCase):
             self.assertIn('class="snippet"', html)
             self.assertIn("docs/library/asyncio.html", html)
             self.assertIn('class="section-tag"', html)
+            self.assertIn('name="section"', html)
+            self.assertIn('name="stemming"', html)
         finally:
             response.close()
 
-    def test_index_route_post_returns_results_fragment_for_ajax_search(self):
-        response = self.client.post(
-            "/",
-            data={"query": "event loop", "section": "library/"},
-            headers={"X-Requested-With": "XMLHttpRequest"},
-        )
+    def test_search_route_renders_results_page_layout(self):
+        response = self.client.get("/search?q=event+loop")
         try:
             html = response.get_data(as_text=True)
 
             self.assertEqual(response.status_code, 200)
+            self.assertIn("event loop - Scout Search", html)
+            self.assertIn('class="results-topbar"', html)
+            self.assertIn('class="results-region"', html)
             self.assertIn("/result/library/asyncio.html", html)
-            self.assertNotIn("<!doctype html>", html.lower())
+            self.assertIn("Scout found", html)
         finally:
             response.close()
 
@@ -280,10 +284,10 @@ class ScoutAppTests(unittest.TestCase):
             first_response.close()
             second_response.close()
 
-    def test_index_route_shows_visited_status_and_click_count(self):
+    def test_search_route_shows_visited_status_and_click_count(self):
         first_response = self.client.get("/result/library/asyncio.html")
         second_response = self.client.get("/result/library/asyncio.html")
-        response = self.client.post("/", data={"query": "event loop", "section": "library/"})
+        response = self.client.get("/search?q=event+loop&section=library/")
         try:
             html = response.get_data(as_text=True)
 
