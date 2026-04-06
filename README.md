@@ -1,15 +1,12 @@
 # Scout
 
-Scout is a local documentation search app built with Flask.
+Scout is a local documentation search application built with Flask. It allows users to search through HTML documentation files stored locally, providing a fast and efficient way to navigate technical documentation without relying on external search engines.
 
-It indexes HTML documents into SQLite, ranks matches with a BM25-style search, and serves a two-page search experience:
-
-- a centered Scout home page with a single search bar
-- a separate search results page with filters, snippets, and click-aware ranking
+The application indexes HTML documents into a SQLite database, uses BM25-style ranking for relevance, and offers a clean, search-engine-like interface with features such as section filtering, click tracking, and snippet highlighting.
 
 ## Features
 
-- Recursive indexing for `.html`, `.xhtml`, and `.xhtl` files
+- Recursive indexing for `.html`, `.xhtml`, and `.xhtml` files
 - SQLite-backed search index in `scout.db`
 - BM25-style ranking with phrase-aware boosts
 - Optional stemming for broader matches
@@ -98,6 +95,37 @@ Open:
 - queries are tokenized with the same tokenizer used during indexing
 - stopwords are removed before scoring
 - a BM25-style calculation balances term frequency and document length
+
+## Project Structure
+
+- `app.py`: Contains the Flask application setup, routes, and search logic.
+- `indexer.py`: Handles the indexing of HTML files into the SQLite database.
+- `main.py`: Command-line interface for indexing and serving the app.
+- `search.py`: Implements the search functionality and ranking algorithms.
+- `templates/`: HTML templates for the web interface.
+- `static/`: Static assets like CSS stylesheets.
+- `docs/`: Pre-indexed documentation for popular Python libraries (NumPy, Pandas, Python standard library).
+- `tests/`: Unit tests for the application.
+- `pyproject.toml`: Project configuration and dependencies.
+
+## Included Documentation
+
+The project comes pre-loaded with documentation for:
+
+- **NumPy**: Comprehensive documentation for the NumPy library, including API reference, tutorials, and examples.
+- **Pandas**: Full documentation for Pandas, covering data manipulation, analysis, and visualization.
+- **Python**: Official Python documentation, including language reference, library reference, and tutorials.
+
+You can index additional documentation by running `python main.py INDEX <path-to-docs>`.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests on the project's repository.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
 - exact phrase hits can add a ranking boost
 - click history can boost documents users open often
 - cached normalization and corpus stats speed up repeated searches
